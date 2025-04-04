@@ -1,12 +1,9 @@
-'use client'
+"use client"
 import React, { useState, useEffect, useRef, useContext } from "react";
+import { SavedContext } from "@/context/SavedItems";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
-import {
-  RegisterLink,
-  LoginLink,
-  LogoutLink,
-} from "@kinde-oss/kinde-auth-nextjs/components";
+import { RegisterLink, LoginLink, LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import Image from "next/image";
 import SaveIcon from '@mui/icons-material/Save';
 import Link from "next/link";
@@ -16,7 +13,7 @@ import { Button } from "@/components/ui/button";
 const HamburgerMenu = ({ user, isUserAuthenticated }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
-
+  const { savedItems } = useContext(SavedContext);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -89,15 +86,15 @@ const HamburgerMenu = ({ user, isUserAuthenticated }) => {
                 </li>
                 <li className="relative p-5">
                   <Link href='/saved' onClick={handleClose}>
-                    <Badge color="secondary">
+                    <Badge badgeContent={savedItems.length} color="secondary">
                       <SaveIcon className="dark:text-white text-[5vmin] hover:text-foreground" />
                     </Badge>
                   </Link>
                 </li>
                 <li className="p-5">
                   <LogoutLink onClick={handleClose}>
-                  <Button variant="destructive">
-                     <h3 className="dark:text-white">Logout</h3> 
+                    <Button variant="destructive">
+                      <h3 className="dark:text-white">Logout</h3> 
                     </Button>
                   </LogoutLink>
                 </li>
@@ -111,4 +108,3 @@ const HamburgerMenu = ({ user, isUserAuthenticated }) => {
 };
 
 export default HamburgerMenu;
-
