@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import React, { createContext, useState, useEffect } from "react";
 
 export const SavedContext = createContext();
@@ -12,18 +12,31 @@ export const SavedProvider = ({ children }) => {
   }, []);
 
   const toggleSaveItem = (item) => {
-    // Extract only the properties you really need:
-    const { id, title, description, thumbnail } = item;
-    const simplifiedItem = { id, title, description, thumbnail };
+    // Use uniqueId if available, otherwise default to item.id
+    const uniqueId = item.uniqueId || item.id;
+    let simplifiedItem;
 
-    // Check if the item is already saved (by id)
-    const exists = savedItems.find((saved) => saved.id === item.id);
+    if (item.poster_path) {
+      // For entertainment items, also include trailerKey if available.
+      simplifiedItem = {
+        id: uniqueId,
+        title: item.title || item.name,
+        overview: item.overview,
+        poster_path: item.poster_path,
+        type: item.type,
+        trailerKey: item.trailerKey || null, // save trailerKey
+      };
+    } else {
+      // For comics/characters
+      const { id, title, description, thumbnail } = item;
+      simplifiedItem = { id: uniqueId, title, description, thumbnail };
+    }
+
+    const exists = savedItems.find((saved) => saved.id === uniqueId);
     let updatedSavedItems;
     if (exists) {
-      // If it exists, remove it
-      updatedSavedItems = savedItems.filter((saved) => saved.id !== item.id);
+      updatedSavedItems = savedItems.filter((saved) => saved.id !== uniqueId);
     } else {
-      // Otherwise, add the simplified item to savedItems
       updatedSavedItems = [...savedItems, simplifiedItem];
     }
     setSavedItems(updatedSavedItems);

@@ -654,7 +654,7 @@ const Characters = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col md:flex-row overflow-x-scroll gap-4 px-4">
-                    {recommendations.map((rec, index) => (
+                    {recommendations?.map((rec, index) => (
                       <div
                         key={index}
                         className="w-full md:w-[30vw] bg-gray-200 rounded-lg relative flex-shrink-0 cursor-pointer transform transition duration-300 ease-in-out hover:shadow-lg hover:shadow-black p-4"
