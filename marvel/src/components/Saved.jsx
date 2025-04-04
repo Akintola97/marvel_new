@@ -54,7 +54,7 @@ const SavedItems = ({ isUserAuthenticated }) => {
       >
         <img
           className="w-full h-[20vh] md:h-[30vh] object-cover rounded-lg transform transition duration-300 ease-in-out hover:shadow-lg hover:shadow-gray-500"
-          src={`${character.thumbnail.path}.${character.thumbnail.extension}`}
+          src={`${character?.thumbnail?.path}.${character?.thumbnail?.extension}`}
           alt={character.name}
         />
         {/* Overlay for Save Icon */}
@@ -147,7 +147,7 @@ const SavedItems = ({ isUserAuthenticated }) => {
           {selectedCharacter && (
             <>
               <Image
-                src={`${selectedCharacter.thumbnail.path}.${selectedCharacter.thumbnail.extension}`}
+                src={`${selectedCharacter?.thumbnail?.path}.${selectedCharacter?.thumbnail?.extension}`}
                 width={500}
                 height={500}
                 layout="responsive"
