@@ -19,23 +19,30 @@ export const SavedProvider = ({ children }) => {
     if (item.poster_path) {
       // For entertainment items, also include trailerKey if available.
       simplifiedItem = {
-      //   id: uniqueId,
-      //   title: item.title || item.name,
-      //   overview: item.overview,
-      //   poster_path: item.poster_path,
-      //   type: item.type,
-      //   trailerKey: item.trailerKey || null, // save trailerKey
-      id: uniqueId,
-      title: item.title || item.name,
-      overview: item.overview || item.description, // Use description as a fallback
-      poster_path: item.poster_path,
-      type: item.type,
-      trailerKey: item.trailerKey || null,
+        //   id: uniqueId,
+        //   title: item.title || item.name,
+        //   overview: item.overview,
+        //   poster_path: item.poster_path,
+        //   type: item.type,
+        //   trailerKey: item.trailerKey || null, // save trailerKey
+        id: uniqueId,
+        title: item.title || item.name,
+        overview: item.overview || item.description, // Use description as a fallback
+        poster_path: item.poster_path,
+        type: item.type,
+        trailerKey: item.trailerKey || null,
       };
     } else {
       // For comics/characters
-      const { id, title, description, thumbnail } = item;
-      simplifiedItem = { id: uniqueId, title, description, thumbnail };
+      // const { id, title, description, thumbnail } = item;
+      // simplifiedItem = { id: uniqueId, title, description, thumbnail };
+      const { id, title, name, description, thumbnail } = item;
+      simplifiedItem = {
+        id: uniqueId,
+        title: title || name,
+        description,
+        thumbnail,
+      };
     }
 
     const exists = savedItems.find((saved) => saved.id === uniqueId);

@@ -650,6 +650,7 @@ export default function Comics({ isUserAuthenticated }) {
         >
           {selectedComic && (
             <>
+            <div className="pt-5">
               <Image
                 src={`${selectedComic.thumbnail.path}.${selectedComic.thumbnail.extension}`}
                 width={500}
@@ -658,6 +659,7 @@ export default function Comics({ isUserAuthenticated }) {
                 priority={true}
                 alt={selectedComic.title}
               />
+              </div>
               <p className="p-5 dark:text-white">
                 {selectedComic.description || "No description available"}
               </p>

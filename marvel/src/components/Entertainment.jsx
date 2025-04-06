@@ -386,18 +386,20 @@ const Entertainment = ({ isUserAuthenticated }) => {
                 {trailerKey ? (
                   <YouTube videoId={trailerKey} className="w-full h-full" />
                 ) : (
+                  <div className="pt-5 w-full h-full">
                   <Image
                     src={
                       selectedItem.poster_path
                         ? `https://image.tmdb.org/t/p/original${selectedItem.poster_path}`
                         : "/placeholder.webp"
                     }
-                    width={500}
-                    height={500}
+                    width={300}
+                    height={300}
                     layout="responsive"
                     priority
                     alt={selectedItem.title || selectedItem.name}
                   />
+                  </div>
                 )}
               </div>
               <p className="p-5 dark:text-white">
