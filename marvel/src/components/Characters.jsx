@@ -196,10 +196,10 @@ const Characters = () => {
         </div>
       ) : (
         <div
-          className={`w-full px-8 scrollbar-hidden ${
+          className={`w-full px-8  ${
             showAll
               ? "grid grid-cols-3 gap-4"
-              : "flex overflow-x-auto scrollbar-hidden space-x-4 md:h-[40vh]"
+              : "flex overflow-x-auto space-x-4 md:h-[40vh]"
           } items-center`}
         >
           {charactersToRender.map((character, index) => (
