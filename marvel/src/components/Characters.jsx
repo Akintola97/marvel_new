@@ -212,8 +212,8 @@ const Characters = () => {
             >
               <img
                 className="w-full h-[20vh] md:h-[30vh] object-cover rounded-lg transform transition duration-300 ease-in-out hover:shadow-lg hover:shadow-gray-500"
-                src={`${character.thumbnail.path}.${character.thumbnail.extension}`}
-                alt={character.name}
+                src={`${character?.thumbnail.path}.${character?.thumbnail?.extension}`}
+                alt={character?.name}
               />
               {/* Overlay for Save Icon on grid */}
               <div

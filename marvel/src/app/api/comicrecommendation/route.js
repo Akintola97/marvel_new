@@ -83,6 +83,7 @@ export async function POST(request) {
 
     const recommendations = JSON.parse(aiResponse);
 
+
     const detailedRecommendations = await Promise.all(
       recommendations.map(async (rec) => {
         const query = encodeURIComponent(rec.title);
@@ -129,6 +130,7 @@ export async function POST(request) {
         }
       })
     );
+    console.log(detailedRecommendations)
     return NextResponse.json(
       { recommendations: detailedRecommendations },
       { status: 200 }

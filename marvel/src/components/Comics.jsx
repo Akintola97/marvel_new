@@ -157,8 +157,8 @@ export default function Comics({ isUserAuthenticated }) {
       >
         <img
           className="w-full h-[20vh] md:h-[30vh] object-cover rounded-lg transform transition duration-300 ease-in-out hover:shadow-lg hover:shadow-gray-500"
-          src={`${comic.thumbnail.path}.${comic.thumbnail.extension}`}
-          alt={comic.title}
+          src={`${comic?.thumbnail?.path}.${comic?.thumbnail?.extension}`}
+          alt={comic?.title}
         />
         {/* Overlay for Save Icon */}
         <div
