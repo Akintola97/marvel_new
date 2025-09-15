@@ -12,6 +12,7 @@ const hash = crypto
   .update(ts.toString() + privateKey + publicKey)
   .digest("hex");
 
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
@@ -31,7 +32,7 @@ export async function GET(request) {
 
     const data = await response.json();
     const comics = data.data.results;
-
+console.log(comics);
 
     return NextResponse.json(comics, { status: 200 });
   } catch (error) {
