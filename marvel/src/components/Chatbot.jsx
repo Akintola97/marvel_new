@@ -989,70 +989,67 @@ export default function Chatbot() {
       </Button>
 
       <Dialog
-        open={open}
-        onClose={handleClose}
-        fullWidth
-        maxWidth="sm"
-        fullScreen={fullScreen}
-        PaperProps={{
-          className:
-            "rounded-3xl sm:rounded-3xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80 flex flex-col h-[70vh] sm:h-[75vh]",
-          elevation: 0,
-        }}
+  open={open}
+  onClose={handleClose}
+  fullWidth
+  maxWidth="sm"   // ✅ only allow up to "sm", never full screen
+  PaperProps={{
+    className:
+      "mx-2 w-full max-w-[95vw] sm:max-w-[600px] rounded-2xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80 flex flex-col h-[70vh] sm:h-[75vh]",
+    elevation: 0,
+  }}
+>
+  <DialogTitle className="relative p-0">
+    <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
+      <div className="font-semibold text-base sm:text-lg">Marvel Assistant</div>
+      <IconButton
+        aria-label="close"
+        onClick={handleClose}
+        className="!text-white/90 hover:!text-white"
       >
-        <DialogTitle className="relative p-0">
-          <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
-            <div className="font-semibold text-base sm:text-lg">
-              Marvel Assistant
-            </div>
+        <CloseIcon />
+      </IconButton>
+    </div>
+  </DialogTitle>
+
+  <DialogContent className="p-0 flex flex-col flex-1">
+    {/* Messages */}
+    <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-3 sm:pt-4">
+      {responses.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
+        </div>
+      )}
+      <MessagesPane items={responses} isTyping={isTyping} endRef={endRef} />
+    </div>
+
+    {/* Input */}
+    <div className="px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-t border-black/10 dark:border-white/10">
+      <div className="rounded-full shadow-lg flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2">
+        <textarea
+          rows={1}
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Ask about Thunderbolts, Deadpool & Wolverine, Loki S2…"
+          className="flex-1 bg-transparent outline-none resize-none text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 py-1"
+        />
+        <Tooltip title="Send">
+          <span>
             <IconButton
-              aria-label="close"
-              onClick={handleClose}
-              className="!text-white/90 hover:!text-white"
+              onClick={handleSendMessages}
+              disabled={!userInput.trim()}
+              className="!text-white !bg-gradient-to-r !from-indigo-600 !to-fuchsia-600 hover:!opacity-90 !w-9 !h-9 sm:!w-10 sm:!h-10"
             >
-              <CloseIcon />
+              <SendIcon fontSize="small" />
             </IconButton>
-          </div>
-        </DialogTitle>
+          </span>
+        </Tooltip>
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
 
-        {/* --- FLEX LAYOUT --- */}
-        <DialogContent className="p-0 flex flex-col flex-1">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-3 sm:pt-4">
-            {responses.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
-              </div>
-            )}
-            <MessagesPane items={responses} isTyping={isTyping} endRef={endRef} />
-          </div>
-
-          {/* Input */}
-          <div className="px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-t border-black/10 dark:border-white/10">
-            <div className="rounded-full shadow-lg flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2">
-              <textarea
-                rows={1}
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="Ask about Thunderbolts, Deadpool & Wolverine, Loki S2…"
-                className="flex-1 bg-transparent outline-none resize-none text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 py-1"
-              />
-              <Tooltip title="Send">
-                <span>
-                  <IconButton
-                    onClick={handleSendMessages}
-                    disabled={!userInput.trim()}
-                    className="!text-white !bg-gradient-to-r !from-indigo-600 !to-fuchsia-600 hover:!opacity-90 !w-9 !h-9 sm:!w-10 sm:!h-10"
-                  >
-                    <SendIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
