@@ -56,83 +56,91 @@
 
 
 
-
+// /api/chatbot/route.ts (or route.js)
 import axios from "axios";
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
   const { messages } = await request.json();
   const OPENAI_KEY = process.env.OPENAI_KEY;
-  const TMDB_KEY = process.env.API_KEY; // 👈 using your API_KEY for TMDB
+  const TMDB_KEY = process.env.API_KEY; // 👈 your TMDB key
 
   if (!OPENAI_KEY) {
     return NextResponse.json({ message: "OpenAI key not set" }, { status: 500 });
   }
 
-  const userMessage = messages[messages.length - 1]?.message || "";
-  let tmdbInfo = null;
+  const userMessage = messages?.[messages.length - 1]?.message || "";
+  let tmdb = null;
 
-  // 🔎 Inline TMDB fetcher
+  // Inline TMDB lookup
   async function fetchTMDBInfo(query) {
     if (!TMDB_KEY) return null;
-
     try {
-      // Search both movies and TV shows
       const [movieRes, tvRes] = await Promise.all([
-        axios.get(`https://api.themoviedb.org/3/search/movie`, {
-          params: { query, api_key: TMDB_KEY },
+        axios.get("https://api.themoviedb.org/3/search/movie", {
+          params: { query, api_key: TMDB_KEY, include_adult: false },
         }),
-        axios.get(`https://api.themoviedb.org/3/search/tv`, {
-          params: { query, api_key: TMDB_KEY },
+        axios.get("https://api.themoviedb.org/3/search/tv", {
+          params: { query, api_key: TMDB_KEY, include_adult: false },
         }),
       ]);
 
       const movie = movieRes.data.results?.[0];
       const tv = tvRes.data.results?.[0];
+
       const choice =
         (movie && !tv) || (movie && movie.popularity > (tv?.popularity || 0))
-          ? { type: "movie", id: movie.id, title: movie.title }
+          ? { type: "movie", id: movie.id, title: movie.title, poster_path: movie.poster_path }
           : tv
-          ? { type: "tv", id: tv.id, title: tv.name }
+          ? { type: "tv", id: tv.id, title: tv.name, poster_path: tv.poster_path }
           : null;
 
       if (!choice) return null;
 
-      // Fetch details (overview, cast, trailers)
       const detailsRes = await axios.get(
         `https://api.themoviedb.org/3/${choice.type}/${choice.id}`,
         { params: { api_key: TMDB_KEY, append_to_response: "videos,credits" } }
       );
 
       const d = detailsRes.data;
+
+      const ytTrailer = d.videos?.results?.find(
+        (v) => v.type === "Trailer" && v.site === "YouTube"
+      );
+      const trailerKey = ytTrailer?.key || null;
+
+      // Build a full-size poster URL if TMDB gave us a path
+      const posterUrl = choice.poster_path
+        ? `https://image.tmdb.org/t/p/original${choice.poster_path}`
+        : d.poster_path
+        ? `https://image.tmdb.org/t/p/original${d.poster_path}`
+        : null;
+
       return {
+        type: choice.type,
+        id: choice.id,
         title: choice.title,
-        release_date: d.release_date || d.first_air_date,
-        overview: d.overview,
-        cast: d.credits?.cast?.slice(0, 5).map((c) => c.name).join(", "),
-        trailer: d.videos?.results?.find(
-          (v) => v.type === "Trailer" && v.site === "YouTube"
-        )
-          ? `https://www.youtube.com/watch?v=${
-              d.videos.results.find(
-                (v) => v.type === "Trailer" && v.site === "YouTube"
-              ).key
-            }`
-          : null,
+        release_date: d.release_date || d.first_air_date || null,
+        overview: d.overview || null,
+        cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name),
+        trailerKey, // 👈 for react-youtube
+        posterUrl,  // 👈 full URL
       };
     } catch (err) {
-      console.error("TMDB fetch error:", err.message);
+      console.error("TMDB fetch error:", err?.message || err);
       return null;
     }
   }
 
-  // Check if query is Marvel/movie/show-related
-  if (/marvel|movie|show|series|release/i.test(userMessage)) {
-    tmdbInfo = await fetchTMDBInfo(userMessage);
+  // Try TMDB when it looks like entertainment content
+  if (/(marvel|movie|film|show|series|season|episode|release|cast|trailer)/i.test(userMessage)) {
+    tmdb = await fetchTMDBInfo(userMessage);
   }
 
+  // Ask the LLM, giving it TMDB JSON (if present) for grounding
+  let aiResponse = "Sorry, I couldn’t get a response.";
   try {
-    const response = await axios.post(
+    const openai = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o",
@@ -140,26 +148,22 @@ export async function POST(request) {
           {
             role: "system",
             content:
-              "You are a Marvel expert. If TMDB info is provided, always use it for accuracy.",
+              "You are a Marvel entertainment expert. Use provided TMDB JSON verbatim for facts (titles, dates, cast). If TMDB is missing, say you’re not certain.",
           },
-          ...(tmdbInfo
+          ...(tmdb
             ? [
                 {
                   role: "system",
-                  content: `Here is real-time data from TMDB:\n${JSON.stringify(
-                    tmdbInfo,
-                    null,
-                    2
-                  )}`,
+                  content: `TMDB_JSON:\n${JSON.stringify(tmdb, null, 2)}`,
                 },
               ]
             : []),
-          ...messages.map((msg) => ({
-            role: msg.from === "user" ? "user" : "assistant",
-            content: msg.message,
+          ...messages.map((m) => ({
+            role: m.from === "user" ? "user" : "assistant",
+            content: m.message,
           })),
         ],
-        temperature: 0.7,
+        temperature: 0.4,
       },
       {
         headers: {
@@ -169,8 +173,7 @@ export async function POST(request) {
       }
     );
 
-    const aiResponse = response.data.choices[0].message.content.trim();
-    return NextResponse.json({ response: aiResponse }, { status: 200 });
+    aiResponse = openai.data.choices?.[0]?.message?.content?.trim() || aiResponse;
   } catch (error) {
     console.error("OpenAI error:", error.response?.data || error.message);
     return NextResponse.json(
@@ -178,4 +181,7 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+
+  // Return both the LLM text and any TMDB struct
+  return NextResponse.json({ response: aiResponse, tmdb }, { status: 200 });
 }
