@@ -56,17 +56,16 @@
 
 
 
-// /api/chatbot/route.js
 import axios from "axios";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic"; // avoid caching
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function POST(request) {
   const { messages } = await request.json();
   const OPENAI_KEY = process.env.OPENAI_KEY;
-  const TMDB_KEY = process.env.API_KEY; // your TMDB key
+  const TMDB_KEY = process.env.API_KEY;
 
   if (!OPENAI_KEY) {
     return NextResponse.json({ message: "OpenAI key not set" }, { status: 500 });
@@ -75,70 +74,96 @@ export async function POST(request) {
   const userMessage = messages?.[messages.length - 1]?.message || "";
   let tmdb = null;
 
-  // Pick a solid trailer key (prefer Official Trailer, fallback to Trailer, then Teaser)
+  // --- 1) Normalize the search to improve matching ---
+  function extractTitle(raw) {
+    if (!raw) return "";
+    const lower = raw.toLowerCase();
+
+    // remove common noise words
+    const noise = [
+      "official", "trailer", "teaser", "release date", "release", "cast",
+      "plot", "story", "when is", "when did", "what is", "marvel", "movie", "film",
+      "show", "series", "season", "episode"
+    ];
+    let cleaned = lower;
+    for (const n of noise) cleaned = cleaned.replace(new RegExp(`\\b${n}\\b`, "g"), " ");
+
+    // collapse whitespace
+    cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+    // if they typed quotes, prefer what's inside: e.g. `"Logan" trailer`
+    const quoted = raw.match(/"([^"]+)"/);
+    if (quoted?.[1]) return quoted[1].trim();
+
+    // otherwise, title-case the cleaned words (helps TMDB relevance a bit)
+    return cleaned
+      .split(" ")
+      .map(w => w ? w[0].toUpperCase() + w.slice(1) : w)
+      .join(" ");
+  }
+
   async function pickTrailerKey(videos = []) {
     if (!videos.length) return null;
 
-    const officialTrailer =
-      videos.find(
-        (v) =>
-          v.site === "YouTube" &&
-          v.type === "Trailer" &&
-          /official/i.test(v.name || "")
-      ) || null;
+    // Prefer Official Trailer
+    const official = videos.find(v =>
+      v.site === "YouTube" && v.type === "Trailer" && /official/i.test(v.name || "")
+    );
+    if (official?.key) return official.key;
 
-    if (officialTrailer?.key) return officialTrailer.key;
+    // Any Trailer
+    const trailer = videos.find(v => v.site === "YouTube" && v.type === "Trailer");
+    if (trailer?.key) return trailer.key;
 
-    const anyTrailer = videos.find((v) => v.site === "YouTube" && v.type === "Trailer");
-    if (anyTrailer?.key) return anyTrailer.key;
+    // Fallback Teaser
+    const teaser = videos.find(v => v.site === "YouTube" && v.type === "Teaser");
+    if (teaser?.key) return teaser.key;
 
-    const teaser = videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
-    return teaser?.key || null;
+    // Last resort: any YouTube video
+    const anyYT = videos.find(v => v.site === "YouTube");
+    return anyYT?.key || null;
   }
 
-  async function fetchTMDBInfo(query) {
+  async function fetchTMDBInfo(rawQuery) {
     if (!TMDB_KEY) return null;
+
+    const query = extractTitle(rawQuery);
+    if (!query) return null;
 
     const common = {
       api_key: TMDB_KEY,
       include_adult: false,
       language: "en-US",
+      region: "US",
     };
 
     try {
-      // Search both movie & TV
-      const [movieRes, tvRes] = await Promise.all([
-        axios.get("https://api.themoviedb.org/3/search/movie", {
-          params: { ...common, query },
-        }),
-        axios.get("https://api.themoviedb.org/3/search/tv", {
-          params: { ...common, query },
-        }),
-      ]);
+      // --- 2) Use multi search for better matching across movie/tv/person ---
+      const multiRes = await axios.get("https://api.themoviedb.org/3/search/multi", {
+        params: { ...common, query },
+      });
 
-      const movie = movieRes.data?.results?.[0];
-      const tv = tvRes.data?.results?.[0];
+      const results = (multiRes.data?.results || []).filter(
+        r => r.media_type === "movie" || r.media_type === "tv"
+      );
 
-      // pick a better match by popularity
-      const choice =
-        (movie && !tv) || (movie && movie.popularity > (tv?.popularity || 0))
-          ? { type: "movie", id: movie.id, title: movie.title, poster_path: movie.poster_path }
-          : tv
-          ? { type: "tv", id: tv.id, title: tv.name, poster_path: tv.poster_path }
-          : null;
+      if (!results.length) return null;
 
-      if (!choice) return null;
+      // heuristic: highest popularity wins
+      results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      const top = results[0];
+      const type = top.media_type; // "movie" | "tv"
 
       // Details (overview, cast, poster)
       const detailsRes = await axios.get(
-        `https://api.themoviedb.org/3/${choice.type}/${choice.id}`,
+        `https://api.themoviedb.org/3/${type}/${top.id}`,
         { params: { ...common, append_to_response: "credits" } }
       );
       const d = detailsRes.data;
 
-      // Videos (language-expanded to improve trailer hit rate)
+      // Videos: fetch with wider language allowance
       const videosRes = await axios.get(
-        `https://api.themoviedb.org/3/${choice.type}/${choice.id}/videos`,
+        `https://api.themoviedb.org/3/${type}/${top.id}/videos`,
         {
           params: {
             ...common,
@@ -150,20 +175,18 @@ export async function POST(request) {
       const trailerKey = await pickTrailerKey(videos);
 
       const baseImg = "https://image.tmdb.org/t/p/original";
-      const posterUrl =
-        (choice.poster_path && `${baseImg}${choice.poster_path}`) ||
-        (d.poster_path && `${baseImg}${d.poster_path}`) ||
-        null;
+      const poster_path = top.poster_path || d.poster_path;
+      const posterUrl = poster_path ? `${baseImg}${poster_path}` : null;
 
       return {
-        type: choice.type,
-        id: choice.id,
-        title: choice.title,
+        type,
+        id: top.id,
+        title: type === "movie" ? (top.title || d.title) : (top.name || d.name),
         release_date: d.release_date || d.first_air_date || null,
         overview: d.overview || null,
-        cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name),
-        trailerKey, // <- for react-youtube
-        posterUrl,  // <- full-size poster url
+        cast: (d.credits?.cast || []).slice(0, 5).map(c => c.name),
+        trailerKey,
+        posterUrl,
       };
     } catch (err) {
       console.error("TMDB fetch error:", err?.response?.data || err?.message || err);
@@ -171,7 +194,6 @@ export async function POST(request) {
     }
   }
 
-  // Only hit TMDB if the query looks entertainment-related
   if (/(marvel|movie|film|show|series|season|episode|release|cast|trailer)/i.test(userMessage)) {
     tmdb = await fetchTMDBInfo(userMessage);
   }
@@ -190,7 +212,7 @@ export async function POST(request) {
               "You are a Marvel entertainment expert. Prefer facts from TMDB_JSON when present (titles, dates, cast). If key info is missing, say you're not certain.",
           },
           ...(tmdb ? [{ role: "system", content: `TMDB_JSON:\n${JSON.stringify(tmdb, null, 2)}` }] : []),
-          ...messages.map((m) => ({
+          ...messages.map(m => ({
             role: m.from === "user" ? "user" : "assistant",
             content: m.message,
           })),
