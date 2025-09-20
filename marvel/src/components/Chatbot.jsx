@@ -675,10 +675,10 @@ import YouTube from "react-youtube";
 
 const Chatbot = () => {
   const [userInput, setUserInput] = useState("");
-  const [responses, setResponses] = useState([]); // { from:"user"|"bot", message:string, tmdb?:{...} }
+  const [responses, setResponses] = useState([]); // { from:"user"|"bot", message:string, tmdb?:object }
   const [isTyping, setIsTyping] = useState(false);
-  const messageEndRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const messageEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -707,6 +707,9 @@ const Chatbot = () => {
         messages: responses.concat(newMessage),
       });
 
+      // Optional: inspect trailer data during dev
+      // console.log("tmdb:", data.tmdb);
+
       setResponses((prev) => [
         ...prev,
         {
@@ -726,7 +729,7 @@ const Chatbot = () => {
     }
   };
 
-  // Enter to send
+  // Enter to send (shift+enter for newline)
   const onKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault?.();
@@ -734,35 +737,34 @@ const Chatbot = () => {
     }
   };
 
-  // Bot message renderer with trailer/poster and quick facts
+  // ---- Subcomponents ----
   const BotBlock = ({ msg }) => {
     const tmdb = msg.tmdb;
 
     return (
       <div className="space-y-3">
+        {/* Trailer / Poster */}
         {tmdb && (tmdb.trailerKey || tmdb.posterUrl) && (
           <div className="w-full overflow-hidden rounded-2xl shadow-md border border-white/10">
             {tmdb.trailerKey ? (
               <YouTube
                 videoId={tmdb.trailerKey}
-                className="w-full h-full"
-                opts={{
-                  width: "100%",
-                  playerVars: { modestbranding: 1, rel: 0 },
-                }}
+                className="w-full"
+                opts={{ width: "100%", height: "260" }} // explicit height so it's visible
               />
             ) : (
               <img
                 src={tmdb.posterUrl}
-                alt={`${tmdb.title} poster`}
+                alt={`${tmdb.title || "Poster"}`}
                 className="w-full max-h-[320px] object-cover"
               />
             )}
           </div>
         )}
 
+        {/* Quick facts card */}
         {tmdb && (
-          <div className="rounded-2xl bg-white/70 dark:bg-gray-700/60 backdrop-blur p-3 text-sm border border-white/20">
+          <div className="rounded-2xl bg-white/80 dark:bg-gray-700/70 backdrop-blur p-3 text-sm border border-white/20">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{tmdb.title}</span>
               {tmdb.release_date && (
@@ -782,6 +784,7 @@ const Chatbot = () => {
           </div>
         )}
 
+        {/* Main LLM text */}
         <div className="prose prose-sm max-w-none dark:prose-invert leading-relaxed">
           <ReactMarkdown>{msg.message}</ReactMarkdown>
         </div>
@@ -865,7 +868,7 @@ const Chatbot = () => {
 
         {/* Body */}
         <DialogContent className="p-0">
-          {/* Subtle background */}
+          {/* Subtle decorative background */}
           <div className="relative">
             <div className="absolute inset-0 pointer-events-none opacity-[0.07] bg-[radial-gradient(circle_at_20%_20%,#6366f1_0,transparent_40%),radial-gradient(circle_at_80%_0%,#d946ef_0,transparent_35%),radial-gradient(circle_at_0%_100%,#22d3ee_0,transparent_35%)]" />
           </div>
@@ -873,8 +876,8 @@ const Chatbot = () => {
           {/* Messages */}
           <div className="relative px-4 pt-4 pb-28 min-h-[380px] max-h-[70vh] overflow-y-auto">
             {responses.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/50 dark:bg-gray-800/50 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-                Ask me about any Marvel movie or show — release dates, cast, plot, or trailers.
+              <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+                Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
               </div>
             )}
 
@@ -902,7 +905,7 @@ const Chatbot = () => {
             </div>
           </div>
 
-          {/* Input bar (sticky) */}
+          {/* Input (sticky) */}
           <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
             <div className="rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-black/10 dark:border-white/10 shadow-lg flex items-center gap-2 px-3 py-2">
               <textarea

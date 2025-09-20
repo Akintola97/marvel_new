@@ -56,14 +56,17 @@
 
 
 
-// /api/chatbot/route.ts (or route.js)
+// /api/chatbot/route.js
 import axios from "axios";
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic"; // avoid caching
+export const revalidate = 0;
 
 export async function POST(request) {
   const { messages } = await request.json();
   const OPENAI_KEY = process.env.OPENAI_KEY;
-  const TMDB_KEY = process.env.API_KEY; // 👈 your TMDB key
+  const TMDB_KEY = process.env.API_KEY; // your TMDB key
 
   if (!OPENAI_KEY) {
     return NextResponse.json({ message: "OpenAI key not set" }, { status: 500 });
@@ -72,22 +75,51 @@ export async function POST(request) {
   const userMessage = messages?.[messages.length - 1]?.message || "";
   let tmdb = null;
 
-  // Inline TMDB lookup
+  // Pick a solid trailer key (prefer Official Trailer, fallback to Trailer, then Teaser)
+  async function pickTrailerKey(videos = []) {
+    if (!videos.length) return null;
+
+    const officialTrailer =
+      videos.find(
+        (v) =>
+          v.site === "YouTube" &&
+          v.type === "Trailer" &&
+          /official/i.test(v.name || "")
+      ) || null;
+
+    if (officialTrailer?.key) return officialTrailer.key;
+
+    const anyTrailer = videos.find((v) => v.site === "YouTube" && v.type === "Trailer");
+    if (anyTrailer?.key) return anyTrailer.key;
+
+    const teaser = videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
+    return teaser?.key || null;
+  }
+
   async function fetchTMDBInfo(query) {
     if (!TMDB_KEY) return null;
+
+    const common = {
+      api_key: TMDB_KEY,
+      include_adult: false,
+      language: "en-US",
+    };
+
     try {
+      // Search both movie & TV
       const [movieRes, tvRes] = await Promise.all([
         axios.get("https://api.themoviedb.org/3/search/movie", {
-          params: { query, api_key: TMDB_KEY, include_adult: false },
+          params: { ...common, query },
         }),
         axios.get("https://api.themoviedb.org/3/search/tv", {
-          params: { query, api_key: TMDB_KEY, include_adult: false },
+          params: { ...common, query },
         }),
       ]);
 
-      const movie = movieRes.data.results?.[0];
-      const tv = tvRes.data.results?.[0];
+      const movie = movieRes.data?.results?.[0];
+      const tv = tvRes.data?.results?.[0];
 
+      // pick a better match by popularity
       const choice =
         (movie && !tv) || (movie && movie.popularity > (tv?.popularity || 0))
           ? { type: "movie", id: movie.id, title: movie.title, poster_path: movie.poster_path }
@@ -97,24 +129,31 @@ export async function POST(request) {
 
       if (!choice) return null;
 
+      // Details (overview, cast, poster)
       const detailsRes = await axios.get(
         `https://api.themoviedb.org/3/${choice.type}/${choice.id}`,
-        { params: { api_key: TMDB_KEY, append_to_response: "videos,credits" } }
+        { params: { ...common, append_to_response: "credits" } }
       );
-
       const d = detailsRes.data;
 
-      const ytTrailer = d.videos?.results?.find(
-        (v) => v.type === "Trailer" && v.site === "YouTube"
+      // Videos (language-expanded to improve trailer hit rate)
+      const videosRes = await axios.get(
+        `https://api.themoviedb.org/3/${choice.type}/${choice.id}/videos`,
+        {
+          params: {
+            ...common,
+            include_video_language: "en,null",
+          },
+        }
       );
-      const trailerKey = ytTrailer?.key || null;
+      const videos = videosRes.data?.results || [];
+      const trailerKey = await pickTrailerKey(videos);
 
-      // Build a full-size poster URL if TMDB gave us a path
-      const posterUrl = choice.poster_path
-        ? `https://image.tmdb.org/t/p/original${choice.poster_path}`
-        : d.poster_path
-        ? `https://image.tmdb.org/t/p/original${d.poster_path}`
-        : null;
+      const baseImg = "https://image.tmdb.org/t/p/original";
+      const posterUrl =
+        (choice.poster_path && `${baseImg}${choice.poster_path}`) ||
+        (d.poster_path && `${baseImg}${d.poster_path}`) ||
+        null;
 
       return {
         type: choice.type,
@@ -123,21 +162,21 @@ export async function POST(request) {
         release_date: d.release_date || d.first_air_date || null,
         overview: d.overview || null,
         cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name),
-        trailerKey, // 👈 for react-youtube
-        posterUrl,  // 👈 full URL
+        trailerKey, // <- for react-youtube
+        posterUrl,  // <- full-size poster url
       };
     } catch (err) {
-      console.error("TMDB fetch error:", err?.message || err);
+      console.error("TMDB fetch error:", err?.response?.data || err?.message || err);
       return null;
     }
   }
 
-  // Try TMDB when it looks like entertainment content
+  // Only hit TMDB if the query looks entertainment-related
   if (/(marvel|movie|film|show|series|season|episode|release|cast|trailer)/i.test(userMessage)) {
     tmdb = await fetchTMDBInfo(userMessage);
   }
 
-  // Ask the LLM, giving it TMDB JSON (if present) for grounding
+  // Ask OpenAI with TMDB grounding
   let aiResponse = "Sorry, I couldn’t get a response.";
   try {
     const openai = await axios.post(
@@ -148,16 +187,9 @@ export async function POST(request) {
           {
             role: "system",
             content:
-              "You are a Marvel entertainment expert. Use provided TMDB JSON verbatim for facts (titles, dates, cast). If TMDB is missing, say you’re not certain.",
+              "You are a Marvel entertainment expert. Prefer facts from TMDB_JSON when present (titles, dates, cast). If key info is missing, say you're not certain.",
           },
-          ...(tmdb
-            ? [
-                {
-                  role: "system",
-                  content: `TMDB_JSON:\n${JSON.stringify(tmdb, null, 2)}`,
-                },
-              ]
-            : []),
+          ...(tmdb ? [{ role: "system", content: `TMDB_JSON:\n${JSON.stringify(tmdb, null, 2)}` }] : []),
           ...messages.map((m) => ({
             role: m.from === "user" ? "user" : "assistant",
             content: m.message,
@@ -173,7 +205,7 @@ export async function POST(request) {
       }
     );
 
-    aiResponse = openai.data.choices?.[0]?.message?.content?.trim() || aiResponse;
+    aiResponse = openai.data?.choices?.[0]?.message?.content?.trim() || aiResponse;
   } catch (error) {
     console.error("OpenAI error:", error.response?.data || error.message);
     return NextResponse.json(
@@ -182,6 +214,5 @@ export async function POST(request) {
     );
   }
 
-  // Return both the LLM text and any TMDB struct
   return NextResponse.json({ response: aiResponse, tmdb }, { status: 200 });
 }
