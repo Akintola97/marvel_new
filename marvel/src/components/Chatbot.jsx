@@ -765,24 +765,21 @@ import {
   DialogTitle,
   IconButton,
   Button,
+  TextField,
   Tooltip,
-  useMediaQuery,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import YouTube from "react-youtube";
-import { useTheme } from "@mui/material/styles";
 
 /** ---------- Stable helpers ---------- */
 const YT_OPTS = { playerVars: { modestbranding: 1, rel: 0 } };
-
 const areMsgEqual = (prev, next) =>
   prev.res.from === next.res.from &&
   prev.res.message === next.res.message &&
   JSON.stringify(prev.res.tmdb || {}) === JSON.stringify(next.res.tmdb || {});
-
 const areListEqual = (prev, next) =>
   prev.items === next.items && prev.isTyping === next.isTyping;
 
@@ -813,7 +810,6 @@ const BotBlock = memo(function BotBlock({ msg }) {
           )}
         </div>
       )}
-
       {tmdb && (
         <div className="rounded-2xl bg-white/80 dark:bg-gray-700/70 backdrop-blur p-3 text-sm border border-white/20">
           <div className="flex flex-wrap items-center gap-2">
@@ -832,31 +828,24 @@ const BotBlock = memo(function BotBlock({ msg }) {
           {tmdb.overview ? <p className="mt-2 leading-relaxed">{tmdb.overview}</p> : null}
         </div>
       )}
-
       <div className="prose prose-sm max-w-none dark:prose-invert leading-relaxed">
         <ReactMarkdown>{msg.message}</ReactMarkdown>
       </div>
     </div>
   );
-}, (prev, next) =>
-  prev.msg.message === next.msg.message &&
-  JSON.stringify(prev.msg.tmdb || {}) === JSON.stringify(next.msg.tmdb || {})
-);
+}, areMsgEqual);
 
 const MessageBubble = memo(function MessageBubble({ res }) {
   const isUser = res.from === "user";
   return (
     <div
-      className={`flex items-end gap-2 ${
-        isUser ? "justify-end" : "justify-start"
-      }`}
+      className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-md flex items-center justify-center text-white text-xs font-bold">
           M
         </div>
       )}
-
       <div
         className={`${
           isUser ? "ml-auto" : "mr-auto"
@@ -872,7 +861,6 @@ const MessageBubble = memo(function MessageBubble({ res }) {
           <BotBlock msg={res} />
         )}
       </div>
-
       {isUser && (
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md flex items-center justify-center text-white text-xs font-bold">
           U
@@ -887,10 +875,7 @@ const MessagesPane = memo(function MessagesPane({ items, isTyping, endRef }) {
     <div className="space-y-3">
       {items.map((res) => (
         <MessageBubble
-          key={
-            res.id ??
-            `${res.from}:${res.message.slice(0, 60)}:${res.tmdb?.trailerKey || ""}`
-          }
+          key={`${res.from}:${res.message.slice(0, 60)}:${res.tmdb?.trailerKey || ""}`}
           res={res}
         />
       ))}
@@ -921,9 +906,6 @@ export default function Chatbot() {
   const [open, setOpen] = useState(false);
   const endRef = useRef(null);
 
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [responses, isTyping]);
@@ -933,7 +915,6 @@ export default function Chatbot() {
     setOpen(false);
     setResponses([]);
   }, []);
-
   const pushMessage = useCallback((msg) => {
     setResponses((prev) => [...prev, msg]);
   }, []);
@@ -951,12 +932,7 @@ export default function Chatbot() {
       const { data } = await axios.post("/api/chatbot", {
         messages: responses.concat(userMsg),
       });
-
-      const botMsg = {
-        from: "bot",
-        message: data.response,
-        tmdb: data.tmdb || null,
-      };
+      const botMsg = { from: "bot", message: data.response, tmdb: data.tmdb || null };
       pushMessage(botMsg);
     } catch (error) {
       console.error("chatbot error", error);
@@ -966,19 +942,15 @@ export default function Chatbot() {
     }
   }, [userInput, responses, pushMessage]);
 
-  const onKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault?.();
-        handleSendMessages();
-      }
-    },
-    [handleSendMessages]
-  );
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault(); // stop newline
+      handleSendMessages();
+    }
+  };
 
   return (
     <>
-      {/* Floating Action Button */}
       <Button
         onClick={handleClickOpen}
         variant="contained"
@@ -989,67 +961,67 @@ export default function Chatbot() {
       </Button>
 
       <Dialog
-  open={open}
-  onClose={handleClose}
-  fullWidth
-  maxWidth="sm"   // ✅ only allow up to "sm", never full screen
-  PaperProps={{
-    className:
-      "mx-2 w-full max-w-[95vw] sm:max-w-[600px] rounded-2xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80 flex flex-col h-[70vh] sm:h-[75vh]",
-    elevation: 0,
-  }}
->
-  <DialogTitle className="relative p-0">
-    <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
-      <div className="font-semibold text-base sm:text-lg">Marvel Assistant</div>
-      <IconButton
-        aria-label="close"
-        onClick={handleClose}
-        className="!text-white/90 hover:!text-white"
+        open={open}
+        onClose={handleClose}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          className:
+            "mx-2 w-full max-w-[95vw] sm:max-w-[600px] rounded-2xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80 flex flex-col h-[70vh] sm:h-[75vh]",
+          elevation: 0,
+        }}
       >
-        <CloseIcon />
-      </IconButton>
-    </div>
-  </DialogTitle>
-
-  <DialogContent className="p-0 flex flex-col flex-1">
-    {/* Messages */}
-    <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-3 sm:pt-4">
-      {responses.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
-          Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
-        </div>
-      )}
-      <MessagesPane items={responses} isTyping={isTyping} endRef={endRef} />
-    </div>
-
-    {/* Input */}
-    <div className="px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-t border-black/10 dark:border-white/10">
-      <div className="rounded-full shadow-lg flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2">
-        <textarea
-          rows={1}
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Ask about Thunderbolts, Deadpool & Wolverine, Loki S2…"
-          className="flex-1 bg-transparent outline-none resize-none text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 py-1"
-        />
-        <Tooltip title="Send">
-          <span>
-            <IconButton
-              onClick={handleSendMessages}
-              disabled={!userInput.trim()}
-              className="!text-white !bg-gradient-to-r !from-indigo-600 !to-fuchsia-600 hover:!opacity-90 !w-9 !h-9 sm:!w-10 sm:!h-10"
-            >
-              <SendIcon fontSize="small" />
+        <DialogTitle className="relative p-0">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
+            <div className="font-semibold text-base sm:text-lg">Marvel Assistant</div>
+            <IconButton aria-label="close" onClick={handleClose} className="!text-white/90 hover:!text-white">
+              <CloseIcon />
             </IconButton>
-          </span>
-        </Tooltip>
-      </div>
-    </div>
-  </DialogContent>
-</Dialog>
+          </div>
+        </DialogTitle>
 
+        <DialogContent className="p-0 flex flex-col flex-1">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-3 sm:pt-4">
+            {responses.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+                Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
+              </div>
+            )}
+            <MessagesPane items={responses} isTyping={isTyping} endRef={endRef} />
+          </div>
+
+          {/* Input */}
+          <div className="px-2 sm:px-4 pb-3 sm:pb-4">
+            <div className="flex gap-2 items-end">
+              <TextField
+                fullWidth
+                multiline
+                minRows={1}
+                maxRows={4}
+                variant="outlined"
+                placeholder="Comic recommendations, Character info..."
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                margin="normal"
+                className="bg-white dark:bg-gray-700 rounded-lg"
+              />
+              <Tooltip title="Send">
+                <span>
+                  <IconButton
+                    onClick={handleSendMessages}
+                    disabled={!userInput.trim()}
+                    className="!text-white !bg-gradient-to-r !from-indigo-600 !to-fuchsia-600 hover:!opacity-90 !w-12 !h-12 mb-2"
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
