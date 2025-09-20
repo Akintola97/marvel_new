@@ -766,15 +766,16 @@ import {
   IconButton,
   Button,
   Tooltip,
+  useMediaQuery,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import YouTube from "react-youtube";
+import { useTheme } from "@mui/material/styles";
 
 /** ---------- Stable helpers ---------- */
-
 const YT_OPTS = { playerVars: { modestbranding: 1, rel: 0 } };
 
 const areMsgEqual = (prev, next) =>
@@ -786,12 +787,10 @@ const areListEqual = (prev, next) =>
   prev.items === next.items && prev.isTyping === next.isTyping;
 
 /** ---------- Memoized subcomponents ---------- */
-
 const BotBlock = memo(function BotBlock({ msg }) {
   const tmdb = msg.tmdb;
   return (
     <div className="space-y-3">
-      {/* Trailer / Poster */}
       {tmdb && (tmdb.trailerKey || tmdb.posterUrl) && (
         <div className="w-full overflow-hidden rounded-2xl shadow-md border border-white/10">
           {tmdb.trailerKey ? (
@@ -815,7 +814,6 @@ const BotBlock = memo(function BotBlock({ msg }) {
         </div>
       )}
 
-      {/* Quick facts card */}
       {tmdb && (
         <div className="rounded-2xl bg-white/80 dark:bg-gray-700/70 backdrop-blur p-3 text-sm border border-white/20">
           <div className="flex flex-wrap items-center gap-2">
@@ -831,25 +829,27 @@ const BotBlock = memo(function BotBlock({ msg }) {
               <span className="opacity-80">Cast:</span> {tmdb.cast.join(", ")}
             </div>
           ) : null}
-          {tmdb.overview ? (
-            <p className="mt-2 leading-relaxed">{tmdb.overview}</p>
-          ) : null}
+          {tmdb.overview ? <p className="mt-2 leading-relaxed">{tmdb.overview}</p> : null}
         </div>
       )}
 
-      {/* Main LLM text */}
       <div className="prose prose-sm max-w-none dark:prose-invert leading-relaxed">
         <ReactMarkdown>{msg.message}</ReactMarkdown>
       </div>
     </div>
   );
-}, areMsgEqual);
+}, (prev, next) =>
+  prev.msg.message === next.msg.message &&
+  JSON.stringify(prev.msg.tmdb || {}) === JSON.stringify(next.msg.tmdb || {})
+);
 
 const MessageBubble = memo(function MessageBubble({ res }) {
   const isUser = res.from === "user";
   return (
     <div
-      className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+      className={`flex items-end gap-2 ${
+        isUser ? "justify-end" : "justify-start"
+      }`}
     >
       {!isUser && (
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-indigo-500 shadow-md flex items-center justify-center text-white text-xs font-bold">
@@ -914,13 +914,15 @@ const MessagesPane = memo(function MessagesPane({ items, isTyping, endRef }) {
 }, areListEqual);
 
 /** ---------- Main component ---------- */
-
 export default function Chatbot() {
   const [userInput, setUserInput] = useState("");
   const [responses, setResponses] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [open, setOpen] = useState(false);
   const endRef = useRef(null);
+
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -958,7 +960,7 @@ export default function Chatbot() {
       pushMessage(botMsg);
     } catch (error) {
       console.error("chatbot error", error);
-      pushMessage({ from: "bot", message: "⚠️ Failed to fetch response" });
+      pushMessage({ from: "bot", message: "Failed to fetch response" });
     } finally {
       setIsTyping(false);
     }
@@ -976,7 +978,7 @@ export default function Chatbot() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating Action Button */}
       <Button
         onClick={handleClickOpen}
         variant="contained"
@@ -986,19 +988,18 @@ export default function Chatbot() {
         Chat
       </Button>
 
-      {/* Chat dialog */}
       <Dialog
         open={open}
         onClose={handleClose}
         fullWidth
         maxWidth="sm"
+        fullScreen={fullScreen}
         PaperProps={{
           className:
-            "rounded-3xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80",
+            "rounded-3xl sm:rounded-3xl overflow-hidden bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80 flex flex-col h-[70vh] sm:h-[75vh]",
           elevation: 0,
         }}
       >
-        {/* Header */}
         <DialogTitle className="relative p-0">
           <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white">
             <div className="font-semibold text-base sm:text-lg">
@@ -1014,9 +1015,10 @@ export default function Chatbot() {
           </div>
         </DialogTitle>
 
-        {/* Messages */}
-        <DialogContent className="p-0">
-          <div className="relative px-2 sm:px-4 pt-3 sm:pt-4 pb-24 min-h-[280px] sm:min-h-[380px] max-h-[70vh] overflow-y-auto">
+        {/* --- FLEX LAYOUT --- */}
+        <DialogContent className="p-0 flex flex-col flex-1">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-3 sm:pt-4">
             {responses.length === 0 && (
               <div className="rounded-2xl border border-dashed border-white/30 dark:border-white/20 bg-white/60 dark:bg-gray-800/60 backdrop-blur p-6 text-center text-sm text-gray-600 dark:text-gray-300">
                 Ask about any Marvel movie or show — release dates, cast, plot, or trailers.
@@ -1026,8 +1028,8 @@ export default function Chatbot() {
           </div>
 
           {/* Input */}
-          <div className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 pb-3 sm:pb-4">
-            <div className="rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-black/10 dark:border-white/10 shadow-lg flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2">
+          <div className="px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-t border-black/10 dark:border-white/10">
+            <div className="rounded-full shadow-lg flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2">
               <textarea
                 rows={1}
                 value={userInput}
