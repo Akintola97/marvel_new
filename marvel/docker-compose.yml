@@ -12,15 +12,22 @@
 #   boltluna-net:
 #     external: true
 
-
 services:
   marvel-app:
-    build: .
+    build:
+      context: .
     container_name: marvel-app
     restart: always
     env_file:
       - .env
     networks:
       - boltluna-net
+    # 👇 Conditional networking depending on ENVIRONMENT
     ports:
-      - "3000:3000"   # 👈 host → container binding
+      - "${PORT_MAPPING:-3000:3000}"   # host → container (only active locally if PORT_MAPPING is set)
+    expose:
+      - "3000"                         # always exposed inside docker network
+
+networks:
+  boltluna-net:
+    external: true
