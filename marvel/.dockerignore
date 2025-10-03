@@ -1,0 +1,25 @@
+# Node dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Next.js build cache
+.next/cache
+
+# Local env files
+.env.local
+.env.development
+.env.test
+.env
+
+# Git & editor
+.git
+.gitignore
+.DS_Store
+*.swp
+*.swo
+
+# Docker files
+Dockerfile
+docker-compose.yml

@@ -1,0 +1,13 @@
+services:
+  marvel-app:
+    build: .
+    container_name: marvel-app
+    restart: always
+    networks:
+      - boltluna-net
+    env_file:
+      - .env
+
+networks:
+  boltluna-net:
+    external: true
